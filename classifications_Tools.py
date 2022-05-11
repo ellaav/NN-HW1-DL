@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from mat4py import loadmat
 from leastSquers import *
 from random import shuffle
+import numpy.matlib as npm
 
 
 
@@ -45,9 +46,10 @@ def gradient_w(w, x, c):
 def gradient_test(file):
     data = loadmat(file)
 
-    c = np.array(data['Ct'])
-    c = c.T
-    x = np.array(data['Yt'])
+    # c = np.array(data['Ct'])
+    # c = c.T
+    # x = np.array(data['Yt'])
+    x, c, x_v, c_v=load_data_and_Suffle_train(file)
     w = get_rand_w(x,c)
     d = get_rand_w(x,c)
     d_n = d / np.linalg.norm(d)
@@ -120,22 +122,15 @@ def SGD_one_step(x, c,w,lr):
     return w - lr * g
 
 
-def sgd_test(file,k,lr):
-    data = loadmat(file)
-
-    c = np.array(data['Ct'])
-    c = c.T
-    x = np.array(data['Yt'])
-    c_v = np.array(data['Cv'])
-    c_v = c_v.T
-    x_v = np.array(data['Yv'])
+def sgd_test(file,k,lr,iternum=30):
+    x,c,x_v,c_v=load_data_and_Suffle_train(file)
     m = x.shape[-1]
     if k>m:
         k=m
 
     j = int(m / k)
 
-    X,C=creat_batces(x,c,k)
+    X,C=creat_batches(x,c,k)
 
     w = get_rand_w(x, c)
     train_acc=[]
@@ -153,24 +148,24 @@ def sgd_test(file,k,lr):
     test_acc.append(np.mean(acc) * 100)
     loss = []
     loss.append(loss_function(w,x,c))
+    for j in range(iternum):
+        for i in range(k):
+            gradient_w(w, X[i], C[i])
+            w = SGD_one_step(X[i], C[i], w, lr)
+            pred = softmax(w, x)
 
-    for i in range(k):
-        gradient_w(w, X[i], C[i])
-        w = SGD_one_step(X[i], C[i], w, lr)
-        pred = softmax(w, x)
+            # calculate train error
 
-        # calculate train error
-
-        prediction = np.argmax(pred,axis=1)
-        labels=np.argmax(c,axis=1)
-        acc = labels == prediction
-        train_acc.append(np.mean(acc) * 100)
-        pred = softmax(w, x_v)
-        prediction = np.argmax(pred, axis=1)
-        labels = np.argmax(c_v, axis=1)
-        acc = labels == prediction
-        test_acc.append(np.mean(acc) * 100)
-        loss.append(loss_function(w, x, c))
+            prediction = np.argmax(pred,axis=1)
+            labels=np.argmax(c,axis=1)
+            acc = labels == prediction
+            train_acc.append(np.mean(acc) * 100)
+            pred = softmax(w, x_v)
+            prediction = np.argmax(pred, axis=1)
+            labels = np.argmax(c_v, axis=1)
+            acc = labels == prediction
+            test_acc.append(np.mean(acc) * 100)
+            loss.append(loss_function(w, x, c))
 
 
 
@@ -179,11 +174,12 @@ def sgd_test(file,k,lr):
 def shuffle(x):
     return np.array(sorted(x, key=lambda k: random.random()))
 
-def creat_batces(x,c,k):
+def creat_batches(x,c,j):
     n,m=x.shape
+    # j=int(m/k)
+    k=int(m/j)
     j=int(m/k)
-    x=(shuffle(x.T)).T
-    c=(shuffle(c)).T
+    c=c.T
 
     if j==0:
         X=[x[:,i] for i in range(m)]
@@ -254,16 +250,16 @@ def SGD_test_least_squers():
     plt.plot(range(len(test_acc)), test_acc, label='test')
     plt.legend()
 
-    # plt.show()
+    plt.show()
 
     plt.figure()
     plt.plot(range(len(loss)), loss, label='loss')
-    # plt.show()
+    plt.show()
 
 
 def choose_param(file):
     loss_arr=[]
-    lrs=[0.001,0.005,0.01,0.05,0.1,0.5]
+    lrs=[0.00125,0.0025,0.0075,0.0125,0.05]
     for lr in lrs:
         print("checking lr-",lr," in file-",file)
         train_acc,test_acc,loss= sgd_test(file,10000,lr)
@@ -276,29 +272,12 @@ def choose_param(file):
     bestLr=lrs[np.argmin(min_loss)]
     print("best learning rate=",bestLr)
     return bestLr
-    # loss_arr=[]
-    # ks=[10,20,30,40,50,60,70]
-    # for k in ks:
-    #     print("checking k=",k," for file=",file)
-    #     train_acc, test_acc, loss = sgd_test(file, k, bestLr)
-    #     loss_arr.append(loss)
-    # sizes=[len(l) for l in loss_arr]
-    # max_size=np.max(sizes)
-    # loss_arr=[l+list(10*np.ones(max_size-len(l))) for l in loss_arr]
-    # min_loss = np.amin(loss_arr, axis=1)
-    # # print(arg_min_loss)
-    # # print(loss_arr)
-    # # loss_arr = [loss_arr[i][arg_min_loss[i]] for i in range(len(loss_arr))]
-    # bestk = ks[np.argmin(min_loss)]
-    # print(file)
-    # print("best learning rate=",bestLr,"\nbest k=",bestk)
-    # return bestk,bestLr
+
 
 def SGD_test_plots():
     dir='HW1_Data\\'
-    files=['GMMData.mat','PeaksData.mat','SwissRollData.mat']
-    ks=[30,40,10]
-    lrs=[0.5,0.05,0.1]
+    files=  ['GMMData.mat','PeaksData.mat','SwissRollData.mat']
+    ks=[60,45,30,15,10]
     i=0
     for f in files:
         # k,lr=ks[i],lrs[i] #choose_param(dir+f)#
@@ -323,10 +302,64 @@ def SGD_test_plots():
         # plt.show()
 
 
+def load_data_and_Suffle_train(file):
+    data = loadmat(file)
+
+    c = np.array(data['Ct'])[:,:200]
+    c = c.T
+    x = np.array(data['Yt'])[:,:200]
+    c_v = np.array(data['Cv'])
+    c_v = c_v.T
+    x_v = np.array(data['Yv'])
+
+    n,m=x.shape
+    xc=np.array([(x.T[i],c[i]) for i in range(m)])
+    xc=shuffle(xc)
+    x = np.array([xc[i][0] for i in range(m)])
+    c=np.array([xc[i][1] for i in range(m)])
+    x=x.T
+
+    return x,c,x_v,c_v
+
+def grad_inp(W, X, C):
+    """
+    :self.W : dim(L-1) * nlabels weights
+    :param X: dim(L-1) * m (m number of examples, n dimension of each exmaple)
+    :param W : dim(L-1) * nlabels
+    :param C: m * nlables
+    :return: dim(L-1) * nlabels
+    """
+    m = X.shape[-1]
+
+    # use for all calculations
+    w_x = np.exp(np.matmul(W.T, X)) # n * m
+    stacked_x_w = np.array(w_x.sum(axis=0)) # 1 * m
+    rep_w_x = npm.repmat(stacked_x_w, w_x.shape[0], 1) # n * m
+    div_w_x = np.divide(w_x, rep_w_x) # n * m
+    subc_w_x = np.subtract(div_w_x, C.T) # n * m
+    return 1/m * np.matmul(W, subc_w_x) # d * m
+
+def sgd_test_withplot(f,k,lr,iternum=20):
+    f_name=(f.split("\\"))[1]
+    train_acc, test_acc, loss = sgd_test(f, k, lr,iternum)
+    plt.figure()
+    plt.plot(range(len(train_acc)), train_acc, label='train')
+    plt.plot(range(len(test_acc)), test_acc, label='test')
+    plt.title('SGD test: {} Set, Acc of lr={} and number of batches={}'.format(f_name, lr, k))
+    plt.legend()
+    name = 'plots\SGD_test_' + str(lr) + '_' + str(k) + '_' + f_name + '.png'
+    plt.savefig(name)
+    plt.show()
+    plt.figure()
+    plt.plot(range(len(loss)), loss, label='loss')
+    plt.title('SGD test: {} Set, loss of lr={} and number of batches={}'.format(f_name, lr, k))
+    plt.show()
+    name = "plots\SGD_test_loss_" + str(lr) + '_' + str(k) + '_' +  f_name + '.png'
+    plt.savefig(name)
 
 
 # SGD_test_plots()
 # SGD_test_least_squers()
-# sgd_test('HW1_Data\GMMData.mat',32,0.05)
+# sgd_test_withplot('HW1_Data\GMMData.mat',15,0.075,100)
 # gradient_test('HW1_Data\SwissRollData.mat')
 # gradient_test2()
